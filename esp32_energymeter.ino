@@ -8,6 +8,7 @@
 #include "BLEDevice.h"
 #include "BLEUtils.h"
 #include "BLEBeacon.h"
+#include <Preferences.h>
 
 extern "C" {
 #include "esp_partition.h"
@@ -16,6 +17,7 @@ extern "C" {
 #include "nvs.h"
 }
 
+#define ENERGY_PULSE_PIN 13     // Define the pin for the energy pulse input
 #define LED 2                   // Onboard led pin on devkit
 #define PULSE 13                // Pin where meter S0+ is connected
 #define RESETBUTTON 15          // Pin where reset button is connected
@@ -23,6 +25,9 @@ extern "C" {
 #define MAX_WATT 3680           // Theoretical max watt value you will consume (230V@16A=3680W) for filtering.
 #define SEND_FREQ 5000          // milliseconds how often to advertise
 #define SAVE_FREQ 60000         // milliseconds how often save pulse counter to flash (see README)
+#define DEEP_SLEEP_TIME 600     // Define the deep sleep time in seconds
+#define PULSE_AWAKE_TIME 600000 // Define the time in milliseconds to stay awake after a pulse
+#define FIRST_PULSE_TIMEOUT 10000  // Define the time to wait for the first pulse after boot
 
 nvs_handle nvsh;
 double ppwh = ((double)PULSE_FACTOR) / 1000; // Pulses per watt hour
@@ -232,4 +237,25 @@ void loop() {
 }
 
 /* ---------------------------------------------------------------------------------- */
- 
+ // Initialize the energy pulse counter
+volatile unsigned long pulseCount = 0;
+// Define the interrupt function for the energy pulse
+void IRAM_ATTR onEnergyPulse() {
+  pulseCount++;
+}
+
+// Define the function to put the ESP32 into deep sleep
+void goToDeepSleep() {
+  // Disable the energy pulse interrupt
+  detachInterrupt(ENERGY_PULSE_PIN);
+
+  // Print the pulse count before going to sleep
+  Serial.printf("Going to sleep. Total pulse count: %lu\n", pulseCount);
+
+  // Configure the timer to wake up from deep sleep
+  esp_sleep_enable_timer_wakeup(PULSE_AWAKE_TIME * 1000);
+
+  // Configure the ESP32 to go to deep sleep
+  esp_deep_sleep_start();
+}
+
