@@ -258,4 +258,39 @@ void goToDeepSleep() {
   // Configure the ESP32 to go to deep sleep
   esp_deep_sleep_start();
 }
+void setup() {
+  // Start the serial communication
+  Serial.begin(115200);
 
+  // Configure the energy pulse pin as an input
+  pinMode(ENERGY_PULSE_PIN, INPUT_PULLUP);
+
+  // Attach an interrupt to the energy pulse pin
+  attachInterrupt(digitalPinToInterrupt(ENERGY_PULSE_PIN), onEnergyPulse, RISING);
+
+  // Wait for the first pulse after boot
+  delay(FIRST_PULSE_TIMEOUT);
+
+  // Check if any pulses have been counted since boot
+  if (pulseCount == 0) {
+    // If no pulses have been counted, go to deep sleep
+    goToDeepSleep();
+  }
+}
+
+void loop() {
+  // Check if the pulse count has changed
+  if (pulseCount > 0) {
+    // If a pulse has been detected, print the pulse count
+    Serial.printf("Pulse detected. Total pulse count: %lu\n", pulseCount);
+
+    // Stay awake for the duration of the pulse
+    delay(PULSE_AWAKE_TIME);
+
+    // Clear the pulse count
+    pulseCount = 0;
+  } else {
+    // If no pulses have been detected, go to deep sleep
+    goToDeepSleep();
+  }
+}
